@@ -1,0 +1,1 @@
+FINDSTR: Cannot open HTTP/\ ; echo --- ; git ls-remote https://github.com/siroosab/freqtrade.git HEAD refs/heads/develop  ; echo RET=0 ; type gitls.txt
