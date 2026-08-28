@@ -9,6 +9,16 @@ from freqtrade.exceptions import OperationalException
 logger = logging.getLogger(__name__)
 
 
+def start_hyperopt_scheduler(args: dict[str, Any]) -> None:
+    """Run the configured pair-by-pair hyperopt scheduler."""
+    from freqtrade.configuration import setup_utils_configuration
+    from freqtrade.enums import RunMode
+    from freqtrade.optimize.hyperopt_scheduler import HyperoptScheduler
+
+    config = setup_utils_configuration(args, RunMode.UTIL_EXCHANGE)
+    HyperoptScheduler(config).run_forever()
+
+
 def start_hyperopt_list(args: dict[str, Any]) -> None:
     """
     List hyperopt epochs previously evaluated

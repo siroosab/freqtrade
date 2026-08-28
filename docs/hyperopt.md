@@ -207,6 +207,42 @@ Hyperopt will now call `populate_entry_trend()` many times (`epochs`) with diffe
 It will use the given historical data and simulate buys based on the buy signals generated with the above function.  
 Based on the results, hyperopt will tell you which parameter combination produced the best results (based on the configured [loss function](#loss-functions)).
 
+## Scheduled pair-by-pair hyperopt
+
+Freqtrade can run a scheduled hyperopt job for each pair independently. Add the following to your
+configuration and set the strategy normally:
+
+```json
+"hyperopt_scheduler": {
+    "pairs": ["BTC/USDT", "ETH/USDT"],
+    "timeframes": ["5m"],
+    "days": 90,
+    "epochs": 300,
+    "spaces": ["default"],
+    "interval_hours": 24,
+    "run_on_start": true
+}
+```
+
+Start the long-running scheduler with `freqtrade hyperopt-scheduler`. It downloads missing data before
+each pair, runs an isolated hyperopt, and stores the best result in
+`user_data/hyperopt_results/by_pair`. The same result is added to the strategy parameter file under
+`params.pairs`, for example:
+
+```json
+"params": {
+    "buy": {"buy_rsi": 30},
+    "pairs": {
+        "BTC/USDT": {"buy": {"buy_rsi": 24}},
+        "ETH/USDT": {"buy": {"buy_rsi": 35}}
+    }
+}
+```
+
+Pair overrides are loaded automatically before strategy callbacks. Existing global parameters remain the
+fallback for pairs without an override. On Windows, register `freqtrade hyperopt-scheduler` as a long-running
+Task Scheduler task using the same Python environment as the bot; no interactive terminal is needed after setup.
+
 !!! Note
     The above setup expects to find ADX, RSI and Bollinger Bands in the populated indicators.
     When you want to test an indicator that isn't used by the bot currently, remember to

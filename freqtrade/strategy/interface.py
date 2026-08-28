@@ -1684,6 +1684,8 @@ class IStrategy(ABC, HyperStrategyMixin):
         :return: minimal ROI entry value or None if none proper ROI entry was found.
         """
 
+        self.ft_load_hyper_params_for_pair(trade.pair)
+
         # Get custom ROI if use_custom_roi is set to True
         custom_roi = None
         if self.use_custom_roi:
@@ -1824,6 +1826,7 @@ class IStrategy(ABC, HyperStrategyMixin):
         :param metadata: Additional information, like the currently traded pair
         :return: a Dataframe with all mandatory indicators for the strategies
         """
+        self.ft_load_hyper_params_for_pair(metadata.get("pair"))
         logger.debug(f"Populating indicators for pair {metadata.get('pair')}.")
 
         # call populate_indicators_Nm() which were tagged with @informative decorator.
@@ -1851,6 +1854,7 @@ class IStrategy(ABC, HyperStrategyMixin):
         :return: DataFrame with buy column
         """
 
+        self.ft_load_hyper_params_for_pair(metadata.get("pair"))
         logger.debug(f"Populating enter signals for pair {metadata.get('pair')}.")
         # Initialize column to work around Pandas bug #56503.
         dataframe.loc[:, "enter_tag"] = ""
@@ -1869,6 +1873,7 @@ class IStrategy(ABC, HyperStrategyMixin):
             currently traded pair
         :return: DataFrame with exit column
         """
+        self.ft_load_hyper_params_for_pair(metadata.get("pair"))
         # Initialize column to work around Pandas bug #56503.
         dataframe.loc[:, "exit_tag"] = ""
         logger.debug(f"Populating exit signals for pair {metadata.get('pair')}.")

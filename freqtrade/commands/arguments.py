@@ -84,6 +84,8 @@ ARGS_HYPEROPT = [
     "early_stop",
 ]
 
+ARGS_HYPEROPT_SCHEDULER: list[str] = []
+
 ARGS_EDGE = [*ARGS_COMMON_OPTIMIZE]
 
 ARGS_LIST_STRATEGIES = [
@@ -394,6 +396,7 @@ class Arguments:
             start_edge,
             start_hyperopt,
             start_hyperopt_list,
+            start_hyperopt_scheduler,
             start_hyperopt_show,
             start_install_ui,
             start_list_data,
@@ -548,6 +551,14 @@ class Arguments:
         )
         hyperopt_cmd.set_defaults(func=start_hyperopt)
         self._build_args(optionlist=ARGS_HYPEROPT, parser=hyperopt_cmd)
+
+        hyperopt_scheduler_cmd = subparsers.add_parser(
+            "hyperopt-scheduler",
+            help="Run scheduled pair-by-pair hyperopt jobs.",
+            parents=[_common_parser, _strategy_parser],
+        )
+        hyperopt_scheduler_cmd.set_defaults(func=start_hyperopt_scheduler)
+        self._build_args(optionlist=ARGS_HYPEROPT_SCHEDULER, parser=hyperopt_scheduler_cmd)
 
         # Add hyperopt-list subcommand
         hyperopt_list_cmd = subparsers.add_parser(

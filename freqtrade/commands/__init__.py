@@ -23,7 +23,11 @@ from freqtrade.commands.deploy_commands import (
     start_install_ui,
     start_new_strategy,
 )
-from freqtrade.commands.hyperopt_commands import start_hyperopt_list, start_hyperopt_show
+from freqtrade.commands.hyperopt_commands import (
+    start_hyperopt_list,
+    start_hyperopt_scheduler,
+    start_hyperopt_show,
+)
 from freqtrade.commands.list_commands import (
     start_list_exchanges,
     start_list_freqAI_models,

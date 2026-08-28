@@ -6,9 +6,11 @@ This module defines a base class for auto-hyperoptable strategies.
 import logging
 from collections import defaultdict
 from collections.abc import Iterator
+from copy import deepcopy
 from pathlib import Path
 
 from freqtrade.constants import Config
+from freqtrade.enums import RunMode
 from freqtrade.exceptions import DependencyException, OperationalException
 from freqtrade.misc import deep_merge_dicts
 from freqtrade.optimize.hyperopt_tools import HyperoptTools
@@ -39,6 +41,9 @@ class HyperStrategyMixin:
         params = self.load_params_from_file()
         params = params.get("params", {})
         self._ft_params_from_file = params
+        self._ft_global_params_from_file = deepcopy(params)
+        self._ft_pair_params_from_file = params.get("pairs", {})
+        self._ft_active_pair: str | None = None
         # Init/loading of parameters is done as part of ft_bot_start().
 
     def enumerate_parameters(self, space: str | None = None) -> Iterator[tuple[str, BaseParameter]]:
@@ -98,6 +103,25 @@ class HyperStrategyMixin:
                 self._ft_params_from_file.get(space, {}), getattr(self, f"{space}_params", {})
             )
             self._ft_set_param(self._ft_hyper_params[space], params_values, space, hyperopt)
+
+    def ft_load_hyper_params_for_pair(self, pair: str | None) -> None:
+        """Apply optional pair-specific parameter overrides from the strategy JSON file."""
+        if self.config.get("runmode") == RunMode.HYPEROPT or not pair:
+            return
+        if pair == self._ft_active_pair:
+            return
+
+        pair_params = self._ft_pair_params_from_file.get(pair)
+        self._ft_active_pair = pair
+        self._ft_params_from_file = deepcopy(self._ft_global_params_from_file)
+        if not isinstance(pair_params, dict):
+            self.ft_set_special_params_from_file()
+            self.ft_load_hyper_params()
+            return
+
+        deep_merge_dicts(pair_params, self._ft_params_from_file)
+        self.ft_set_special_params_from_file()
+        self.ft_load_hyper_params()
 
     def load_params_from_file(self) -> dict:
         filename_str = getattr(self, "__file__", "")
