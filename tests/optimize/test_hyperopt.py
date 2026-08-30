@@ -1,4 +1,5 @@
 # pragma pylint: disable=missing-docstring,W0212,C0103
+import logging
 from datetime import datetime, timedelta
 from functools import partial, wraps
 from pathlib import Path
@@ -14,6 +15,7 @@ from freqtrade.enums import ExitType, RunMode
 from freqtrade.exceptions import OperationalException
 from freqtrade.optimize.hyperopt import Hyperopt
 from freqtrade.optimize.hyperopt.hyperopt_auto import HyperOptAuto
+from freqtrade.optimize.hyperopt_scheduler import HyperoptScheduler
 from freqtrade.optimize.hyperopt_tools import HyperoptTools
 from freqtrade.optimize.optimize_reports import generate_strategy_stats
 from freqtrade.optimize.space import SKDecimal, ft_IntDistribution
@@ -53,6 +55,25 @@ def generate_result_metrics():
         "is_random": False,
         "is_best": 1,
     }
+
+
+def test_hyperopt_scheduler_logs_pair_failures(mocker, default_conf, caplog, tmp_path) -> None:
+    default_conf["user_data_dir"] = tmp_path
+    default_conf["hyperopt_scheduler"] = {
+        "pairs": ["ETH/USDT"],
+        "interval_hours": 1,
+        "run_on_start": False,
+        "log_summary_only": True,
+    }
+    scheduler = HyperoptScheduler(default_conf)
+    mocker.patch("freqtrade.optimize.hyperopt.Hyperopt", side_effect=RuntimeError("boom"))
+
+    with caplog.at_level(logging.INFO):
+        result = scheduler._run_pair("ETH/USDT")
+
+    assert result is None
+    assert log_has_re(r"Starting scheduled hyperopt for ETH/USDT", caplog)
+    assert log_has_re(r"Scheduled hyperopt failed for ETH/USDT", caplog)
 
 
 def test_setup_hyperopt_configuration_without_arguments(mocker, default_conf, caplog) -> None:

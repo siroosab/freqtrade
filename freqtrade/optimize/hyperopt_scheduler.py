@@ -3,6 +3,7 @@
 import logging
 import time
 from copy import deepcopy
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +33,28 @@ class HyperoptScheduler:
             logger.setLevel(logging._nameToLevel[level_name])
         else:
             logger.setLevel(logging.INFO)
+
+    def _status_file(self) -> Path:
+        return Path(self.config["user_data_dir"]) / "hyperopt_results" / "scheduler_status.json"
+
+    def _write_pair_status(self, pair: str, status: str, **details: Any) -> None:
+        status_file = self._status_file()
+        status_file.parent.mkdir(parents=True, exist_ok=True)
+        current = {}
+        if status_file.is_file():
+            try:
+                import json
+
+                loaded = json.loads(status_file.read_text(encoding="utf-8"))
+                current = loaded if isinstance(loaded, dict) else {}
+            except (OSError, ValueError):
+                current = {}
+        current[pair] = {
+            "status": status,
+            "timestamp": datetime.now(UTC).isoformat(),
+            **details,
+        }
+        file_dump_json(status_file, current, log=False)
 
     def get_pairs(self) -> list[str]:
         pairs = self.settings.get("pairs")
@@ -74,49 +97,73 @@ class HyperoptScheduler:
     def _run_pair(self, pair: str) -> dict[str, Any] | None:
         from freqtrade.optimize.hyperopt import Hyperopt
 
+        self._write_pair_status(pair, "running")
         if self.settings.get("log_summary_only", True):
             logger.info("Starting scheduled hyperopt for %s", pair)
 
-        hyperopt_config = deepcopy(self.config)
-        hyperopt_config["runmode"] = RunMode.HYPEROPT
-        hyperopt_config["pairs"] = [pair]
-        hyperopt_config.setdefault("exchange", {})["pair_whitelist"] = [pair]
-        hyperopt_config["epochs"] = self.settings.get("epochs", hyperopt_config.get("epochs", 100))
-        hyperopt_config["spaces"] = self.settings.get(
-            "spaces", hyperopt_config.get("spaces", ["default"])
-        )
-        hyperopt_config["disableparamexport"] = True
+        try:
+            hyperopt_config = deepcopy(self.config)
+            hyperopt_config["runmode"] = RunMode.HYPEROPT
+            hyperopt_config["pairs"] = [pair]
+            hyperopt_config.setdefault("exchange", {})["pair_whitelist"] = [pair]
+            hyperopt_config["epochs"] = self.settings.get(
+                "epochs", hyperopt_config.get("epochs", 100)
+            )
+            hyperopt_config["spaces"] = self.settings.get(
+                "spaces", hyperopt_config.get("spaces", ["default"])
+            )
+            hyperopt_config["disableparamexport"] = True
 
-        hyperopt = Hyperopt(hyperopt_config)
-        self._download_pair(pair, hyperopt)
-        hyperopt.start()
-        best = hyperopt.current_best_epoch
-        if not best:
-            logger.warning("No hyperopt result was produced for %s", pair)
+            hyperopt = Hyperopt(hyperopt_config)
+            self._download_pair(pair, hyperopt)
+            hyperopt.start()
+            best = hyperopt.current_best_epoch
+            if not best:
+                self._write_pair_status(pair, "failed")
+                logger.warning("No hyperopt result was produced for %s", pair)
+                return None
+
+            if self.settings.get("log_summary_only", True):
+                logger.info(
+                    "Finished scheduled hyperopt for %s with loss %.6f",
+                    pair,
+                    float(best["loss"]),
+                )
+
+            result_dir = Path(self.config["user_data_dir"]) / "hyperopt_results" / "by_pair"
+            result_dir.mkdir(parents=True, exist_ok=True)
+            params = best.get("params_details", best.get("params", {}))
+            result = {
+                "strategy_name": hyperopt.hyperopter.get_strategy_name(),
+                "pair": pair,
+                "params": params,
+                "loss": best["loss"],
+                "results_metrics": best.get("results_metrics", {}),
+            }
+            self._write_pair_status(
+                pair,
+                "success",
+                loss=float(best["loss"]),
+                results_metrics=best.get("results_metrics", {}),
+            )
+            file_dump_json(result_dir / f"{pair_to_filename(pair)}.json", result, log=False)
+            self._update_strategy_params(hyperopt, pair, params)
+            return result
+        except Exception:
+            try:
+                self._write_pair_status(pair, "failed")
+            except Exception:
+                logger.exception("Could not persist Hyperopt status for %s", pair)
+            logger.exception("Scheduled hyperopt failed for %s", pair)
             return None
-
-        if self.settings.get("log_summary_only", True):
-            logger.info("Finished scheduled hyperopt for %s with loss %.6f", pair, float(best["loss"]))
-
-        result_dir = Path(self.config["user_data_dir"]) / "hyperopt_results" / "by_pair"
-        result_dir.mkdir(parents=True, exist_ok=True)
-        params = best.get("params_details", best.get("params", {}))
-        result = {
-            "strategy_name": hyperopt.hyperopter.get_strategy_name(),
-            "pair": pair,
-            "params": params,
-            "loss": best["loss"],
-            "results_metrics": best.get("results_metrics", {}),
-        }
-        file_dump_json(result_dir / f"{pair_to_filename(pair)}.json", result, log=False)
-        self._update_strategy_params(hyperopt, pair, params)
-        return result
 
     def _update_strategy_params(self, hyperopt: Any, pair: str, params: dict[str, Any]) -> None:
         from freqtrade.optimize.hyperopt_tools import HyperoptTools
 
         strategy_file = Path(hyperopt.hyperopter.backtesting.strategy.__file__).with_suffix(".json")
-        strategy_params = HyperoptTools.load_params(strategy_file) if strategy_file.is_file() else {}
+        strategy_params = (
+            HyperoptTools.load_params(strategy_file) if strategy_file.is_file() else {}
+        )
         strategy_params["strategy_name"] = hyperopt.hyperopter.get_strategy_name()
         strategy_params.setdefault("params", {}).setdefault("pairs", {})[pair] = params
         file_dump_json(strategy_file, strategy_params, log=False)
@@ -129,9 +176,12 @@ class HyperoptScheduler:
         try:
             with lock.acquire(timeout=1):
                 for pair in self.get_pairs():
-                    result = self._run_pair(pair)
-                    if result:
-                        results.append(result)
+                    try:
+                        result = self._run_pair(pair)
+                        if result:
+                            results.append(result)
+                    except Exception:
+                        logger.exception("Unexpected scheduler failure while processing %s", pair)
         except Timeout:
             logger.info("Another running instance of freqtrade Hyperopt detected.")
         return results
