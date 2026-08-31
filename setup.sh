@@ -249,7 +249,11 @@ function install_runtime_files() {
 
     if [ ! -f user_data/config.json ]; then
         echo_block "Creating default config in user_data/config.json"
-        if command -v freqtrade >/dev/null 2>&1; then
+        if [ -f config_examples/config_binance.example.json ]; then
+            cp -f config_examples/config_binance.example.json user_data/config.json
+            echo "Copied Binance example config to user_data/config.json"
+        elif command -v freqtrade >/dev/null 2>&1; then
+            echo "No bundled example config found; falling back to interactive freqtrade new-config."
             freqtrade new-config --config user_data/config.json >/dev/null 2>&1 || true
         else
             echo "freqtrade is not on PATH yet; skipping automatic config generation."
