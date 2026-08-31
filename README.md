@@ -109,11 +109,16 @@ For users who want to keep the bot hands-off after installation, the safest setu
     "interval_hours": 24,
     "run_on_start": true,
     "log_level": "INFO",
-    "log_summary_only": true
+    "log_summary_only": true,
+    "erase_data": false
 }
 ```
 
 This keeps the scheduler configurable from config instead of hardcoding behavior into the code.
+
+Set `erase_data` to `true` when each scheduled download should delete the existing candle files
+for the pair and timeframe before downloading fresh history. The default is `false`, which preserves
+and updates existing data.
 
 `hyperopt_min_trades` is important for short-run or small-sample optimization windows, because a value of `1` avoids failing hyperopt when the selected date range does not generate enough trades for the configured strategy.
 

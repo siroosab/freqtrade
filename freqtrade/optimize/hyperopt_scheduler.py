@@ -27,6 +27,7 @@ class HyperoptScheduler:
         self.settings.setdefault("run_on_start", True)
         self.settings.setdefault("log_level", "INFO")
         self.settings.setdefault("log_summary_only", True)
+        self.settings.setdefault("erase_data", False)
 
         level_name = str(self.settings.get("log_level", "INFO")).upper()
         if level_name in logging._nameToLevel:
@@ -66,15 +67,29 @@ class HyperoptScheduler:
             raise ValueError("hyperopt_scheduler.pairs must be a list of pair names")
         return list(dict.fromkeys(pairs))
 
+    def _timeframe_days(self, timeframe: str, default_days: int | None = None) -> int | None:
+        explicit_days = self.settings.get("informative_days", {})
+        if not isinstance(explicit_days, dict):
+            explicit_days = {}
+
+        if timeframe in explicit_days:
+            return explicit_days[timeframe]
+
+        if default_days is not None:
+            return default_days
+
+        if "days" in self.settings:
+            return self.settings["days"]
+
+        return self.config.get("days")
+
     def _download_pair(self, pair: str, hyperopt: Any | None = None) -> None:
         from freqtrade.data.history import download_data_main
 
-        download_config = deepcopy(self.config)
-        download_config["runmode"] = RunMode.UTIL_EXCHANGE
-
+        base_timeframe = self.config.get("timeframe", "5m")
         timeframes = list(
             dict.fromkeys(
-                self.settings.get("timeframes", [self.config.get("timeframe", "5m")])
+                self.settings.get("timeframes", [base_timeframe])
             )
         )
         pairs = [pair]
@@ -87,12 +102,20 @@ class HyperoptScheduler:
                 if inf_timeframe not in timeframes:
                     timeframes.append(inf_timeframe)
 
-        download_config["pairs"] = list(dict.fromkeys(pairs))
-        download_config["timeframes"] = timeframes
-        if "days" in self.settings:
-            download_config["days"] = self.settings["days"]
-            download_config.pop("timerange", None)
-        download_data_main(download_config)
+        default_days = self._timeframe_days(base_timeframe, self.settings.get("days"))
+        for timeframe in timeframes:
+            download_config = deepcopy(self.config)
+            download_config["runmode"] = RunMode.UTIL_EXCHANGE
+            download_config["pairs"] = list(dict.fromkeys(pairs))
+            download_config["timeframes"] = [timeframe]
+            download_config["erase"] = bool(self.settings.get("erase_data", False))
+
+            days = self._timeframe_days(timeframe, default_days)
+            if days is not None:
+                download_config["days"] = days
+                download_config.pop("timerange", None)
+
+            download_data_main(download_config)
 
     def _run_pair(self, pair: str) -> dict[str, Any] | None:
         from freqtrade.optimize.hyperopt import Hyperopt

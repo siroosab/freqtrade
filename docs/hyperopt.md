@@ -224,9 +224,13 @@ configuration and set the strategy normally:
     "epochs": 20,
     "spaces": ["default"],
     "interval_hours": 24,
-    "run_on_start": true
+    "run_on_start": true,
+    "erase_data": false
 }
 ```
+
+Set `erase_data` to `true` to remove the existing candle data before each scheduled download and
+replace it with fresh history. Leave it as `false` to keep and update existing data.
 
 If the optimized period is short or the trading logic produces very few entries, set
 `hyperopt_min_trades` to `1` so the optimizer can still evaluate the pair without failing the run.

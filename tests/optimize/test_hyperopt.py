@@ -76,6 +76,49 @@ def test_hyperopt_scheduler_logs_pair_failures(mocker, default_conf, caplog, tmp
     assert log_has_re(r"Scheduled hyperopt failed for ETH/USDT", caplog)
 
 
+def test_hyperopt_scheduler_forwards_erase_data(mocker, default_conf, tmp_path) -> None:
+    default_conf["user_data_dir"] = tmp_path
+    default_conf["hyperopt_scheduler"] = {"erase_data": True}
+    scheduler = HyperoptScheduler(default_conf)
+    download_data = mocker.patch("freqtrade.data.history.download_data_main")
+
+    scheduler._download_pair("ETH/USDT")
+
+    download_config = download_data.call_args.args[0]
+    assert download_config["erase"] is True
+
+
+def test_hyperopt_scheduler_downloads_informative_timeframes_with_separate_days(
+    mocker, default_conf, tmp_path
+) -> None:
+    default_conf["user_data_dir"] = tmp_path
+    default_conf["timeframe"] = "5m"
+    default_conf["hyperopt_scheduler"] = {
+        "days": 20,
+        "informative_days": {"1d": 50, "1h": 30},
+    }
+    scheduler = HyperoptScheduler(default_conf)
+    download_data = mocker.patch("freqtrade.data.history.download_data_main")
+
+    strategy = mocker.Mock()
+    strategy.gather_informative_pairs.return_value = [
+        ("BTC/USDT", "1d", ""),
+        ("BTC/USDT", "1h", ""),
+    ]
+    hyperopt = mocker.Mock()
+    hyperopt.hyperopter.backtesting.strategy = strategy
+
+    scheduler._download_pair("ETH/USDT", hyperopt)
+
+    assert download_data.call_count == 3
+    assert {tuple(call.args[0]["timeframes"]) for call in download_data.call_args_list} == {
+        ("5m",),
+        ("1d",),
+        ("1h",),
+    }
+    assert {call.args[0]["days"] for call in download_data.call_args_list} == {20, 30, 50}
+
+
 def test_setup_hyperopt_configuration_without_arguments(mocker, default_conf, caplog) -> None:
     patched_configuration_load_config_file(mocker, default_conf)
 
