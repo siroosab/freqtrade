@@ -239,6 +239,34 @@ function config() {
     echo_block "Please use 'freqtrade new-config -c user_data/config.json' to generate a new configuration file."
 }
 
+function install_runtime_files() {
+    mkdir -p user_data
+    mkdir -p user_data/strategies
+
+    if [ -f .venv/bin/activate ]; then
+        source .venv/bin/activate
+    fi
+
+    if [ ! -f user_data/config.json ]; then
+        echo_block "Creating default config in user_data/config.json"
+        if command -v freqtrade >/dev/null 2>&1; then
+            freqtrade new-config --config user_data/config.json >/dev/null 2>&1 || true
+        else
+            echo "freqtrade is not on PATH yet; skipping automatic config generation."
+        fi
+    fi
+
+    if [ -f Hyperopt_config.json ]; then
+        cp -f Hyperopt_config.json user_data/Hyperopt_config.json
+        echo "Copied Hyperopt config to user_data/Hyperopt_config.json"
+    fi
+
+    if [ -d strategies ]; then
+        cp -a strategies/. user_data/strategies/
+        echo "Copied strategy files to user_data/strategies/"
+    fi
+}
+
 function install() {
 
     echo_block "Installing mandatory dependencies"
@@ -261,6 +289,7 @@ function install() {
     echo
     reset
     config
+    install_runtime_files
     echo_block "Run the bot !"
     echo "You can now use the bot by executing 'source .venv/bin/activate; freqtrade <subcommand>'."
     echo "You can see the list of available bot sub-commands by executing 'source .venv/bin/activate; freqtrade --help'."
