@@ -62,11 +62,17 @@ build_and_install_service() {
     echo "=== ${SUBCOMMAND} service settings ==="
 
     read -p "Config file name [default: ${DEFAULT_CONFIG}]: " CONFIG_NAME
-    CONFIG_NAME="${CONFIG_NAME:-$DEFAULT_CONFIG}"
+    if [[ -z "$CONFIG_NAME" ]] || [[ "$CONFIG_NAME" =~ ^[YyNn]$ ]]; then
+        echo "Using default config file: $DEFAULT_CONFIG"
+        CONFIG_NAME="$DEFAULT_CONFIG"
+    fi
     local CONFIG_PATH="$USER_DATA_DIR/$CONFIG_NAME"
 
     read -p "Strategy name [default: SampleStrategy]: " STRATEGY
-    STRATEGY="${STRATEGY:-SampleStrategy}"
+    if [[ -z "$STRATEGY" ]] || [[ "$STRATEGY" =~ ^[YyNn]$ ]]; then
+        echo "Using default strategy: SampleStrategy"
+        STRATEGY="SampleStrategy"
+    fi
 
     local SERVICE_NAME="freqtrade-${BOT_NAME}-${SERVICE_SUFFIX}"
     local SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
