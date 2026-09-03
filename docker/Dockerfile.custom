@@ -1,11 +1,16 @@
-FROM freqtradeorg/freqtrade:develop
+FROM node:26.8.1-alpine AS ui-builder
 
-# Switch user to root if you must install something from apt
-# Don't forget to switch the user back below!
-# USER root
+RUN apk add --no-cache git \
+	&& corepack enable
 
-# The below dependency - pyti - serves as an example. Please use whatever you need!
-RUN pip install --user pyti
+WORKDIR /app
 
-# Switch back to user (only if you required root above)
-# USER ftuser
+RUN git clone --depth 1 https://github.com/siroosab/frequi.git . \
+	&& pnpm install --frozen-lockfile \
+	&& pnpm run build
+
+FROM freqtradeorg/freqtrade:stable
+
+COPY --from=ui-builder /app/dist/ /freqtrade/freqtrade/rpc/api_server/ui/installed/
+RUN printf 'siroosab/frequi-main\n' > /freqtrade/freqtrade/rpc/api_server/ui/installed/.uiversion
+

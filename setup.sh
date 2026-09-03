@@ -115,8 +115,7 @@ function updateenv() {
         exit 1
     fi
 
-    echo "Installing freqUI"
-    freqtrade install-ui
+    install_custom_ui
 
     echo "pip install completed"
     echo
@@ -127,6 +126,38 @@ function updateenv() {
             exit 1
         fi
     fi
+}
+
+function install_custom_ui() {
+    local ui_repo="https://github.com/siroosab/frequi.git"
+    local ui_source
+    local ui_dest="freqtrade/rpc/api_server/ui/installed"
+
+    if ! command -v node >/dev/null 2>&1 || ! command -v pnpm >/dev/null 2>&1; then
+        echo "Custom FreqUI requires Node.js and pnpm. Install them and run setup.sh again."
+        exit 1
+    fi
+
+    ui_source=$(mktemp -d)
+    echo_block "Building custom FreqUI from ${ui_repo}"
+    if ! git clone --depth 1 "${ui_repo}" "${ui_source}/frequi"; then
+        rm -rf "${ui_source}"
+        echo "Failed downloading custom FreqUI"
+        exit 1
+    fi
+
+    if ! (cd "${ui_source}/frequi" && pnpm install --frozen-lockfile && pnpm run build); then
+        rm -rf "${ui_source}"
+        echo "Failed building custom FreqUI"
+        exit 1
+    fi
+
+    mkdir -p "${ui_dest}"
+    rm -rf "${ui_dest:?}"/*
+    cp -a "${ui_source}/frequi/dist/." "${ui_dest}/"
+    printf 'siroosab/frequi-main\n' > "${ui_dest}/.uiversion"
+    rm -rf "${ui_source}"
+    echo "Custom FreqUI installed"
 }
 
 # Install bot MacOS
