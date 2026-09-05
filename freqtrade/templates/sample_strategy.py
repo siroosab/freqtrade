@@ -28,6 +28,7 @@ from freqtrade.strategy import (
     merge_informative_pair,
     stoploss_from_absolute,
     stoploss_from_open,
+    get_pair_control,
 )
 
 # --------------------------------
@@ -102,6 +103,10 @@ class SampleStrategy(IStrategy):
 
     # Number of candles the strategy requires before producing valid signals
     startup_candle_count: int = 200
+
+    def pair_control(self, pair: str) -> dict:
+        """Read live pre-trade and risk controls configured for this pair in FreqUI."""
+        return get_pair_control(pair)
 
     # Optional order type mapping.
     order_types = {

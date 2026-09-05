@@ -17,6 +17,7 @@ from freqtrade.strategy.parameters import (
     IntParameter,
     RealParameter,
 )
+from freqtrade.strategy.pair_control import get_pair_control
 from freqtrade.strategy.strategy_helper import (
     merge_informative_pair,
     stoploss_from_absolute,
@@ -37,6 +38,7 @@ __all__ = [
     "DecimalParameter",
     "IntParameter",
     "RealParameter",
+    "get_pair_control",
     # timeframe helpers
     "timeframe_to_minutes",
     "timeframe_to_next_date",

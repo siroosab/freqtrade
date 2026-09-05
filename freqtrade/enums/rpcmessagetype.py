@@ -23,6 +23,7 @@ class RPCMessageType(StrEnum):
     WHITELIST = "whitelist"
     ANALYZED_DF = "analyzed_df"
     NEW_CANDLE = "new_candle"
+    PAIR_CONTROL = "pair_control"
 
     def __repr__(self):
         # TODO: do we still need to overwrite __repr__? Impact needs to be looked at in detail
