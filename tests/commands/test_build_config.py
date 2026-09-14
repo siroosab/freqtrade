@@ -34,7 +34,7 @@ def test_validate_is_int():
     assert not validate_is_int("-ee")
 
 
-@pytest.mark.parametrize("exchange", ["bybit", "binance", "kraken"])
+@pytest.mark.parametrize("exchange", ["bybit", "binance", "coinex", "kraken"])
 def test_start_new_config(mocker, caplog, exchange):
     wt_mock = mocker.patch.object(Path, "write_text", MagicMock())
     mocker.patch.object(Path, "exists", MagicMock(return_value=True))
@@ -76,6 +76,44 @@ def test_start_new_config(mocker, caplog, exchange):
     )
     assert result["exchange"]["name"] == exchange
     assert result["timeframe"] == "15m"
+
+
+def test_ask_user_config_include_coinex_and_default_api_listen_addr(mocker):
+    captured = {}
+
+    def fake_prompt(questions):
+        captured["questions"] = questions
+        return {
+            "dry_run": True,
+            "stake_currency": "USDT",
+            "stake_amount": "100",
+            "max_open_trades": "3",
+            "timeframe_in_config": "Have the strategy define timeframe.",
+            "fiat_display_currency": "USD",
+            "exchange_name": "coinex",
+            "trading_mode": "futures",
+            "telegram": False,
+            "api_server": False,
+            "api_server_listen_addr": "0.0.0.0",
+            "api_server_username": "freqtrader",
+            "api_server_password": "secret",
+        }
+
+    prompt_mock = mocker.patch("freqtrade.configuration.deploy_config.prompt", side_effect=fake_prompt)
+
+    ask_user_config()
+
+    questions = captured["questions"]
+    exchange_question = next(q for q in questions if q["name"] == "exchange_name")
+    assert "coinex" in exchange_question["choices"]
+
+    perpetual_question = next(q for q in questions if q["name"] == "trading_mode")
+    assert perpetual_question["when"]({"exchange_name": "coinex"})
+    assert perpetual_question["when"]({"exchange_name": "kucoin"})
+
+    api_addr_question = next(q for q in questions if q["name"] == "api_server_listen_addr")
+    assert api_addr_question["default"] == "0.0.0.0"
+    assert prompt_mock.call_count == 1
 
 
 def test_start_new_config_exists(mocker, caplog):

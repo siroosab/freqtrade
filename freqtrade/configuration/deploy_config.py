@@ -48,7 +48,6 @@ def ask_user_config() -> dict[str, Any]:
     :returns: Dict with keys to put into template
     """
 
-    from freqtrade.configuration.detect_environment import running_in_docker
     from freqtrade.exchange import available_exchanges
 
     questions: list[dict[str, Any]] = [
@@ -109,6 +108,7 @@ def ask_user_config() -> dict[str, Any]:
             "message": "Select exchange",
             "choices": [
                 "binance",
+                "coinex",
                 "binanceus",
                 "bingx",
                 "gate",
@@ -126,7 +126,8 @@ def ask_user_config() -> dict[str, Any]:
             "message": "Do you want to trade Perpetual Swaps (perpetual futures)?",
             "default": False,
             "filter": lambda val: "futures" if val else "spot",
-            "when": lambda x: x["exchange_name"] in ["binance", "gate", "okx", "bybit"],
+            "when": lambda x: x["exchange_name"]
+            in ["binance", "coinex", "gate", "kucoin", "okx", "bybit"],
         },
         {
             "type": "autocomplete",
@@ -184,7 +185,7 @@ def ask_user_config() -> dict[str, Any]:
                 "Insert Api server Listen Address (0.0.0.0 for docker, "
                 "otherwise best left untouched)"
             ),
-            "default": "127.0.0.1" if not running_in_docker() else "0.0.0.0",  # noqa: S104
+            "default": "0.0.0.0",  # noqa: S104
             "when": lambda x: x["api_server"],
         },
         {
